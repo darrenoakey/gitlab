@@ -15,6 +15,27 @@ CUR_DIR=$(pwd)
 REL_PATH="${CUR_DIR#${GIT_ROOT}}"
 REL_PATH=${REL_PATH#/} # Remove leading slash if present
 
+# Check for optional filename argument
+FILENAME="$1"
+BLOB_MODE=false
+FILE_PATH=""
+if [[ -n "$FILENAME" ]]; then
+  # If FILENAME is an absolute path, use as-is (likely rare)
+  if [[ "$FILENAME" = /* ]]; then
+    FILE_PATH="$FILENAME"
+  else
+    FILE_PATH="$REL_PATH/$FILENAME"
+    FILE_PATH="${FILE_PATH#/}"
+  fi
+  # Does the file exist (relative to GIT_ROOT)?
+  if [[ -f "$GIT_ROOT/$FILE_PATH" ]]; then
+    BLOB_MODE=true
+  else
+    echo -e "${RED}Error: File '$FILE_PATH' does not exist in this repository.${NC}" >&2
+    exit 1
+  fi
+fi
+
 # Get git remote url (use 'origin' by default)
 REMOTE_URL=$(git remote get-url origin 2>/dev/null)
 if [[ -z "$REMOTE_URL" ]]; then
@@ -44,10 +65,16 @@ fi
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 # Compose the URL
-if [[ -n "$REL_PATH" ]]; then
-  URL="https://gitlab.com/${OWNER}/${REPO}/-/tree/${BRANCH}/${REL_PATH}"
+if [[ "$BLOB_MODE" = true ]]; then
+  # Show file as a blob
+  URL="https://gitlab.com/${OWNER}/${REPO}/-/blob/${BRANCH}/${FILE_PATH}"
 else
-  URL="https://gitlab.com/${OWNER}/${REPO}/-/tree/${BRANCH}"
+  # Directory tree
+  if [[ -n "$REL_PATH" ]]; then
+    URL="https://gitlab.com/${OWNER}/${REPO}/-/tree/${BRANCH}/${REL_PATH}"
+  else
+    URL="https://gitlab.com/${OWNER}/${REPO}/-/tree/${BRANCH}"
+  fi
 fi
 
 echo "Opening: $URL"
